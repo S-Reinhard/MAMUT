@@ -1,60 +1,95 @@
+#include <LiquidCrystal_I2C.h>
+
 #include <Pushbutton.h>
 
 #include "HX711.h"
-#include "waage_pinout.h"
+#include "constants.h"
 
 HX711 scale;
 
 Pushbutton tareButton(TARE_BTN_PIN);
+LiquidCrystal_I2C lcd(I2C_ADDRESS, COLUMNS, RISING);
 
 
-void setup() {
+  void setup() {
   Serial.begin(57600);
-  Serial.println("Initializing the scale");
+
+  lcd.init();
+  lcd.backlight();
+  //lcd.autoscroll();
+  lcd.setCursor(0, 0);
+
+    lcd.println("Initializing the scale");
 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-            
-  scale.set_scale(-471.497);
 
-  Serial.println("Readings:");
+  scale.set_scale(24753);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
 }
 
 double getTareValue(long reading) {
-  return reading / ( KNOWN_WEIGHT * NUM_OF_OBJECTS );
+  return reading / (KNOWN_WEIGHT * NUM_OF_OBJECTS);
+}
+
+void printRemoveObjects() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("remove ");
+  lcd.print(OBJECT_NAMES);
+  lcd.setCursor(0, 1);
+  lcd.print("then press tare");
+}
+
+void printPlaceObjects() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Place ");
+  lcd.print(NUM_OF_OBJECTS);
+  lcd.print(" ");
+  lcd.print(OBJECT_NAMES);
+  lcd.setCursor(0, 1);
+  lcd.print("then press tare");
 }
 
 void recalibrate() {
   if (scale.is_ready()) {
     // clear old tare value
     scale.set_scale();
-    Serial.println("Tare... remove any weights from the scale. Then push the button.");
+    printRemoveObjects();
     tareButton.waitForButton();
     scale.tare();
 
     // calculate new tare value
-    Serial.println("Tare done...");
-    Serial.print("Place ");
-    Serial.print(NUM_OF_OBJECTS);
-    Serial.println(" known known objects on the scale... then press the button");
+    printPlaceObjects();
     tareButton.waitForButton();
     double tareValue = getTareValue(scale.get_units(10));
     scale.set_scale(tareValue);
-    Serial.println(tareValue);
 
-    Serial.println("calibration is finished. Objects can be removed");
-  } 
-  else {
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.println(tareValue);
+    lcd.setCursor(0,1);
+    lcd.println("finished");
+  } else {
+    lcd.clear();
+    lcd.setCursor(0,0);
     Serial.println("HX711 not found.");
   }
 }
 
 void loop() {
-  Serial.print("one reading:\t");
-  Serial.print(scale.get_units(), 1);
-  Serial.print("\t| average:\t");
-  Serial.println(scale.get_units(10), 5);
-  
-  if(tareButton.getSingleDebouncedPress())
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("counted ");
+  lcd.setCursor(0,1);
+  lcd.print(scale.get_units(10), 1);
 
-  delay(5000);
+  if (tareButton.getSingleDebouncedPress()) {
+    recalibrate();
+  }
+    scale.power_down();
+    delay(5000);
+    scale.power_up();
 }
