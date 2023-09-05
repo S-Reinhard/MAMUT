@@ -7,34 +7,47 @@
 
 HX711 scale;
 
-Pushbutton tareButton(TARE_BTN_PIN);
+Pushbutton calBtn(CAL_BTN_PIN);
+Pushbutton tareBtn(TARE_BTN_PIN);
 LiquidCrystal_I2C lcd(I2C_ADDRESS, COLUMNS, RISING);
 
-
-  void setup() {
+void setup() {
   Serial.begin(57600);
 
   lcd.init();
   lcd.backlight();
-  //lcd.autoscroll();
-  lcd.setCursor(0, 0);
-
-    lcd.println("Initializing the scale");
-
+  
+  resetLCD();
+  lcd.print("init scale");
+  
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   scale.set_scale(3922.67993);
+  scale.tare();
 
+  resetLCD();
+}
+
+void resetLCD() {
   lcd.clear();
-  lcd.setCursor(0, 0);
+  lcd.setCursor(0,0);
 }
 
 double getTareValue(double reading) {
-  return reading / ( KNOWN_WEIGHT * NUM_OF_OBJECTS );
+  return reading / ( KNOWN_WEIGHT_PER_UNIT * NUM_OF_CAL_OBJECTS );
+}
+
+void printCountedObjects(int amount) {
+  resetLCD();
+  lcd.print("counted:");
+  lcd.setCursor(0,1);
+  lcd.print(amount);
+  lcd.print(" ");
+  lcd.print(NAME(amount));
+  
 }
 
 void printRemoveObjects() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
+  resetLCD();
   lcd.print("remove ");
   lcd.print(OBJECT_NAMES);
   lcd.setCursor(0, 1);
@@ -42,12 +55,11 @@ void printRemoveObjects() {
 }
 
 void printPlaceObjects() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
+  resetLCD();
   lcd.print("Place ");
-  lcd.print(NUM_OF_OBJECTS);
+  lcd.print(NUM_OF_CAL_OBJECTS);
   lcd.print(" ");
-  lcd.print(OBJECT_NAMES);
+  lcd.print(NAME(NUM_OF_CAL_OBJECTS));
   lcd.setCursor(0, 1);
   lcd.print("then press tare");
 }
@@ -58,39 +70,46 @@ void recalibrate() {
     // clear old tare value
     scale.set_scale();
     printRemoveObjects();
-    tareButton.waitForButton();
+    calBtn.waitForButton();
     scale.tare();
 
     // calculate new tare value
     printPlaceObjects();
-    tareButton.waitForButton();
+    calBtn.waitForButton();
+    resetLCD();
+    lcd.print("wait...");
     double tareValue = getTareValue(scale.get_units(1000));
     scale.set_scale(tareValue);
     Serial.println(tareValue, 5);
 
-    lcd.clear();
-    lcd.setCursor(0,0);
+    resetLCD();
     lcd.println(tareValue);
     lcd.setCursor(0,1);
     lcd.println("finished");
   } else {
-    lcd.clear();
-    lcd.setCursor(0,0);
+    resetLCD();
     Serial.println("HX711 not found.");
   }
 }
 
 void loop() {
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("counted ");
-  lcd.setCursor(0,1);
-  lcd.print(scale.get_units(10), 1);
-  if(!tareButton.isPressed()) {
+  //get the absolute load on the scale
+  double load = abs(scale.get_units(10000)); //10000 because the lcd display does not work properly other wise. at least for me
+
+  // print the rounded value 
+  printCountedObjects((int) (0.5 + load));
+
+  //recalibrate the scale if cal button is pressed
+  if(!calBtn.isPressed()) {
     recalibrate();
   }
 
+  if(!tareBtn.isPressed()) {
+    scale.tare();
+    Serial.println("tare");
+  }
+
     scale.power_down();
-    delay(5000);
+    delay(1000);
     scale.power_up();
 }
