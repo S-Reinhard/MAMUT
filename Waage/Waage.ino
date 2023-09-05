@@ -14,13 +14,13 @@ void setup() {
 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
             
-  scale.set_scale(3923.00);
+  scale.set_scale(3922.67993);
 
   Serial.println("Readings:");
   scale.tare();
 }
 
-double getTareValue(long reading) {
+double getTareValue(double reading) {
   return reading / ( KNOWN_WEIGHT * NUM_OF_OBJECTS );
 }
 
